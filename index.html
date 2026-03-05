@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIN FLOOR - 定义空间的质感与温度</title>
+    <!-- 外部资源 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
+    
+    <!-- 自定义样式 -->
+    <style type="text/css">
+        /* Tailwind 主题扩展 */
+        @tailwind base;
+        @tailwind components;
+        @tailwind utilities;
+
+        @layer base {
+            :root {
+                --color-primary: #7A6349; /* 高级木色 - 参考xsurfaces */
+                --color-secondary: #9D886C;
+                --color-accent: #E8E0D0;
+                --color-dark: #2A2622;
+                --color-light: #F9F7F4;
+                --color-coffee: #3C2F2F; /* 黑咖色 */
+            }
+        }
+
+        @layer utilities {
+            .content-auto { content-visibility: auto; }
+            .text-balance { text-wrap: balance; }
+            .animate-fade-in { animation: fadeIn 0.8s ease-in-out; }
+            .animate-slide-up { animation: slideUp 0.6s ease-out; }
+            .animate-pulse-slow { animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        }
+
+        @layer components {
+            .btn-primary { @apply bg-primary text-white px-6 py-3 rounded-md font-medium hover:bg-primary/90 transition-all duration-300 transform hover:-translate-y-0.5; }
+            .btn-secondary { @apply bg-white text-primary border border-primary px-6 py-3 rounded-md font-medium hover:bg-primary/5 transition-all duration-300 transform hover:-translate-y-0.5; }
+            .nav-link { @apply text-neutral-700 hover:text-primary transition-colors text-sm font-medium relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 after:bg-primary after:transition-all hover:after:w-full; }
+            .card-hover { @apply transition-all duration-500 hover:shadow-xl hover:-translate-y-2; }
+            .floor-btn { @apply px-6 py-2 rounded-full border border-neutral-200 hover:border-primary transition-all text-neutral-700; }
+            .floor-btn.active { @apply bg-primary text-white border-primary; }
+            .vr-scene-btn { @apply transition-all; }
+            .vr-scene-btn.active { @apply border-primary bg-primary/5; }
+        }
+
+        /* 全局样式 */
+        body {
+            scroll-behavior: smooth;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+
+        /* 自定义动画 */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        /* VR样式优化 - 参考burrow的极简控件 */
+        #vrContainer .pnlm-controls {
+            background: rgba(255, 255, 255, 0.08) !important;
+            border-radius: 12px !important;
+            backdrop-filter: blur(8px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        }
+
+        #vrContainer .pnlm-hotspot {
+            width: 32px !important;
+            height: 32px !important;
+            background: rgba(122, 99, 73, 0.9) !important;
+            border: 2px solid white !important;
+            border-radius: 50% !important;
+            transition: all 0.3s ease !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+        }
+
+        #vrContainer .pnlm-hotspot:hover {
+            transform: scale(1.3) !important;
+            background: rgba(122, 99, 73, 1) !important;
+        }
+
+        /* 热点弹窗 - 参考oakelcity的精致弹窗 */
+        #hotspotPopup {
+            transform: translateY(-10px);
+            box-shadow: 0 12px 32px rgba(0,0,0,0.1);
+            border-radius: 12px !important;
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+
+        /* 图片懒加载过渡 */
+        img {
+            transition: opacity 0.5s ease;
+        }
+
+        img.loading {
+            opacity: 0.5;
+        }
+
+        /* 导航栏滚动效果 */
+        .header-scrolled {
+            @apply h-14 shadow-sm bg-white/95;
+        }
+
+        /* 文本渐变 - 高级视觉效果 */
+        .text-gradient {
+            background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        /* 首页背景图优化 */
+        .hero-bg {
+            background-position: center center !important;
+            background-size: cover !important;
+            background-repeat: no-repeat !important;
+        }
+        
+        /* 黑咖色背景 */
+        .bg-coffee {
+            background-color: var(--color-coffee) !important;
+        }
+        
+        /* 关于我们背景图优化 */
+        .about-bg {
+            background-position: center center !important;
+            background-size: cover !important;
+            background-repeat: no-repeat !important;
+        }
+    </style>
+</head>
+<body class="font-sans bg-light text-dark overflow-x-hidden">
+    <!-- 导航栏 - 参考burrow极简悬浮设计 -->
+    <header class="fixed w-full z-50 bg-white/90 backdrop-blur-md border-b border-neutral-100 transition-all duration-500">
+        <div class="container mx-auto px-4 md:px-8 lg:px-16">
+            <nav class="flex justify-between items-center h-20">
+                <a href="#" class="text-2xl font-bold tracking-tight text-dark">
+                    WIN<span class="text-gradient">FLOOR</span>
+                </a>
+                
+                <!-- 桌面导航 - 参考oakelcity的简约布局 -->
+                <ul class="hidden md:flex items-center space-x-10">
+                    <li><a href="#floors" class="nav-link">地板系列</a></li>
+                    <li><a href="#style-matcher" class="nav-link">风格匹配</a></li>
+                    <li><a href="#vr-experience" class="nav-link">VR体验</a></li>
+                    <li><a href="#about" class="nav-link">关于我们</a></li>
+                    <li><a href="#contact" class="btn-primary">咨询顾问</a></li>
+                </ul>
+                
+                <!-- 移动端菜单按钮 -->
+                <button id="mobileMenuBtn" class="md:hidden text-dark">
+                    <i class="fa fa-bars text-xl"></i>
+                </button>
+            </nav>
+        </div>
+        
+        <!-- 移动端菜单 - 全屏极简设计 -->
+        <div id="mobileMenu" class="md:hidden hidden bg-white fixed inset-0 z-50 flex flex-col justify-center items-center">
+            <button id="closeMenuBtn" class="absolute top-6 right-6 text-dark">
+                <i class="fa fa-times text-xl"></i>
+            </button>
+            <div class="flex flex-col space-y-8 text-center">
+                <a href="#floors" class="text-xl text-dark hover:text-primary transition-colors">地板系列</a>
+                <a href="#style-matcher" class="text-xl text-dark hover:text-primary transition-colors">风格匹配</a>
+                <a href="#vr-experience" class="text-xl text-dark hover:text-primary transition-colors">VR体验</a>
+                <a href="#about" class="text-xl text-dark hover:text-primary transition-colors">关于我们</a>
+                <a href="#contact" class="btn-primary mt-4">咨询顾问</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- 英雄区 - 使用指定的客厅实景图作为背景 -->
+    <section class="pt-20 h-screen relative overflow-hidden">
+        <!-- 背景图片 - 已替换为用户指定的首页展示图链接 -->
+        <div class="absolute inset-0 hero-bg" style="background-image: url('https://kimi-web-img.moonshot.cn/img/img.freepik.com/bbee4e53e164e0c5a6f7a851764578b6b7d776fd.jpg'); filter: brightness(0.88);">
+            <div class="absolute inset-0 bg-gradient-to-b from-dark/30 via-dark/10 to-light/10"></div>
+        </div>
+        
+        <!-- 内容 - 居中极简排版 -->
+        <div class="container mx-auto px-4 md:px-8 lg:px-16 relative h-full flex flex-col justify-center animate-fade-in">
+            <h1 class="text-[clamp(3rem,8vw,5rem)] font-bold text-white leading-tight max-w-3xl mb-6 text-balance">
+                地板，<br>赋予空间<span class="text-accent">温度</span>与<span class="text-accent">质感</span>
+            </h1>
+            <p class="text-[clamp(1.1rem,2vw,1.4rem)] text-white/90 max-w-xl mb-10 text-balance">
+                精选全球优质材质，为你的空间定制专属地板方案，通过沉浸式VR体验，预见理想家的样子
+            </p>
+            <div class="flex flex-col sm:flex-row gap-5">
+                <a href="#floors" class="btn-secondary text-center">
+                    探索地板系列
+                </a>
+                <a href="#vr-experience" class="btn-primary text-center">
+                    立即VR体验 <i class="fa fa-vr-cardboard ml-2"></i>
+                </a>
+            </div>
+            
+            <!-- 滚动提示 - 参考burrow的微动效 -->
+            <div class="absolute bottom-10 left-1/2 transform -translate-x-1/2 animate-pulse-slow">
+                <a href="#floors" class="text-white/80 hover:text-white flex flex-col items-center">
+                    <span class="text-sm mb-2">向下探索</span>
+                    <i class="fa fa-chevron-down"></i>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- 地板系列 - 参考oakelcity的网格布局+极简展示 -->
+    <section id="floors" class="py-24 md:py-32 bg-light">
+        <div class="container mx-auto px-4 md:px-8 lg:px-16">
+            <div class="text-center mb-16 animate-slide-up">
+                <h2 class="text-[clamp(2rem,5vw,3.5rem)] font-bold mb-4 text-dark">精选地板系列</h2>
+                <p class="text-neutral-600 max-w-2xl mx-auto text-lg">每一款地板都为独特的生活方式设计，匹配专属的空间美学</p>
+            </div>
+            
+            <!-- 地板选择器 - 居中极简设计 -->
+            <div class="flex flex-wrap justify-center gap-4 mb-16" id="floorSelector">
+                <button class="floor-btn active" data-floor="oak">北欧橡木</button>
+                <button class="floor-btn" data-floor="walnut">胡桃木</button>
+                <button class="floor-btn" data-floor="maple">枫木</button>
+                <button class="floor-btn" data-floor="bamboo">竹纹</button>
+                <button class="floor-btn" data-floor="concrete">水泥纹</button>
+            </div>
+            
+            <!-- 地板展示区 - 参考xsurfaces的非对称布局 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+                <div class="floor-preview overflow-hidden rounded-2xl shadow-2xl card-hover">
+                    <img id="floorImage" src="https://kimi-web-img.moonshot.cn/img/appalachianflooring.com/d86afc56e02939d27e665862a452ffc76d2d3024.jpg" alt="北欧橡木地板" class="w-full h-auto transform hover:scale-105 transition-transform duration-700">
+                </div>
+                
+                <div class="floor-details animate-slide-up">
+                    <h3 id="floorName" class="text-3xl font-bold mb-6 text-dark">北欧橡木地板</h3>
+                    <p id="floorDesc" class="text-neutral-700 text-lg mb-8 max-w-lg">
+                        自然纹理，温润质感，适配北欧、日式简约风格家具，为空间带来自然舒适的氛围。精选欧洲进口橡木，纹理清晰自然，色泽温润柔和，每一片地板都保留了木材的天然美感。
+                    </p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+                        <div class="bg-white p-6 rounded-xl shadow-sm">
+                            <h4 class="font-medium text-primary mb-2">适用风格</h4>
+                            <p id="floorStyle" class="text-neutral-700">北欧、日式、极简、原木风</p>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl shadow-sm">
+                            <h4 class="font-medium text-primary mb-2">适配家具</h4>
+                            <p id="floorFurniture" class="text-neutral-700">原木色实木家具、棉麻布艺沙发、藤编装饰</p>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl shadow-sm">
+                            <h4 class="font-medium text-primary mb-2">环保等级</h4>
+                            <p class="text-neutral-700">E0级无醛添加，符合欧盟环保标准</p>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl shadow-sm">
+                            <h4 class="font-medium text-primary mb-2">耐磨性能</h4>
+                            <p class="text-neutral-700">AC5级耐磨层，适合高频使用空间</p>
+                        </div>
+                    </div>
+                    
+                    <a href="#style-matcher" class="inline-flex items-center text-primary font-medium hover:text-secondary transition-colors group">
+                        查看匹配家具风格 
+                        <i class="fa fa-arrow-right ml-2 group-hover:translate-x-1 transition-transform"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 风格匹配器 - 参考burrow的卡片式设计 -->
+    <section id="style-matcher" class="py-24 md:py-32 bg-neutral-100">
+        <div class="container mx-auto px-4 md:px-8 lg:px-16">
+            <div class="text-center mb-16">
+                <h2 class="text-[clamp(2rem,5vw,3.5rem)] font-bold mb-4 text-dark">风格匹配</h2>
+                <p class="text-neutral-600 max-w-2xl mx-auto text-lg">根据你选择的地板，为你推荐最适配的家具组合</p>
+            </div>
+            
+            <!-- 风格匹配展示 - 网格卡片布局 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <!-- 客厅搭配 -->
+                <div class="bg-white rounded-2xl overflow-hidden shadow-lg card-hover">
+                    <div class="h-80 overflow-hidden">
+                        <img src="https://kimi-web-img.moonshot.cn/img/skyryedesign.com/35d8eaf0fa06435ad7bb92bd2d395aa357752b9b.jpeg" alt="客厅搭配" class="w-full h-full object-cover transform hover:scale-105 transition-transform duration-700">
+                    </div>
+                    <div class="p-8">
+                        <h3 class="text-2xl font-bold mb-3">客厅搭配</h3>
+                        <p class="text-neutral-600 mb-6">浅橡木布艺沙发 + 原木茶几 + 羊毛混纺地毯</p>
+                        <button class="match-furniture-btn w-full py-3 border border-primary text-primary hover:bg-primary hover:text-white rounded-md transition-colors" data-scene="livingroom">
+                            在VR中查看
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 卧室搭配 -->
+                <div class="bg-white rounded-2xl overflow-hidden shadow-lg card-hover">
+                    <div class="h-80 overflow-hidden">
+                        <img src="https://skyryedesign.com/wp-content/uploads/2025/11/Abode-by-Kentwood-_-Brushed-Oak-Frozen-Lake-_-Tempo-Collection-1.jpeg" alt="卧室搭配" class="w-full h-full object-cover transform hover:scale-105 transition-transform duration-700">
+                    </div>
+                    <div class="p-8">
+                        <h3 class="text-2xl font-bold mb-3">卧室搭配</h3>
+                        <p class="text-neutral-600 mb-6">拉丝橡木床架 + 纯棉床品 + 悬浮床头柜</p>
+                        <button class="match-furniture-btn w-full py-3 border border-primary text-primary hover:bg-primary hover:text-white rounded-md transition-colors" data-scene="bedroom">
+                            在VR中查看
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 餐厅搭配 -->
+                <div class="bg-white rounded-2xl overflow-hidden shadow-lg card-hover">
+                    <div class="h-80 overflow-hidden">
+                        <img src="https://skyryedesign.com/wp-content/uploads/2025/11/9-1.jpeg" alt="餐厅搭配" class="w-full h-full object-cover transform hover:scale-105 transition-transform duration-700">
+                    </div>
+                    <div class="p-8">
+                        <h3 class="text-2xl font-bold mb-3">餐厅搭配</h3>
+                        <p class="text-neutral-600 mb-6">实木餐桌 + 皮质餐椅 + 简约餐边柜</p>
+                        <button class="match-furniture-btn w-full py-3 border border-primary text-primary hover:text-white rounded-md transition-colors" data-scene="dining">
+                            在VR中查看
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 阳台搭配 -->
+                <div class="bg-white rounded-2xl overflow-hidden shadow-lg card-hover">
+                    <div class="h-80 overflow-hidden">
+                        <img src="https://skyryedesign.com/wp-content/uploads/2025/11/3-2-649x1024.jpeg" alt="阳台搭配" class="w-full h-full object-cover transform hover:scale-105 transition-transform duration-700">
+                    </div>
+                    <div class="p-8">
+                        <h3 class="text-2xl font-bold mb-3">阳台搭配</h3>
+                        <p class="text-neutral-600 mb-6">防腐木休闲椅 + 藤编茶几 + 绿植装饰</p>
+                        <button class="match-furniture-btn w-full py-3 border border-primary text-primary hover:text-white rounded-md transition-colors" data-scene="balcony">
+                            在VR中查看
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- VR体验区 - 核心交互区 参考xsurfaces的沉浸式设计 -->
+    <section id="vr-experience" class="py-24 md:py-32 bg-white">
+        <div class="container mx-auto px-4 md:px-8 lg:px-16">
+            <div class="text-center mb-16">
+                <h2 class="text-[clamp(2rem,5vw,3.5rem)] font-bold mb-4 text-dark">沉浸式VR体验</h2>
+                <p class="text-neutral-600 max-w-2xl mx-auto text-lg">360°查看地板与家具的搭配效果，点击热点可查看家具详情</p>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                <!-- 左侧：场景选择 - 固定侧边栏 -->
+                <div class="lg:col-span-1">
+                    <div class="bg-light rounded-2xl shadow-lg p-8 sticky top-24">
+                        <h3 class="text-2xl font-bold mb-8">选择体验场景</h3>
+                        
+                        <!-- 地板选择 - 极简下拉框 -->
+                        <div class="mb-8">
+                            <label class="block text-sm font-medium mb-3 text-neutral-700">地板类型</label>
+                            <select id="vrFloorSelector" class="w-full px-5 py-3 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary bg-white">
+                                <option value="oak">北欧橡木</option>
+                                <option value="walnut">胡桃木</option>
+                                <option value="maple">枫木</option>
+                                <option value="bamboo">竹纹</option>
+                                <option value="concrete">水泥纹</option>
+                            </select>
+                        </div>
+                        
+                        <!-- 场景选择 - 卡片式按钮 -->
+                        <div class="mb-8">
+                            <label class="block text-sm font-medium mb-3 text-neutral-700">空间场景</label>
+                            <div class="grid grid-cols-1 gap-4">
+                                <button class="vr-scene-btn active p-4 border border-primary bg-primary/5 rounded-lg text-left" data-scene="livingroom">
+                                    <span class="block font-medium text-lg">客厅</span>
+                                    <span class="text-sm text-neutral-600">25㎡ · 开放式布局</span>
+                                </button>
+                                <button class="vr-scene-btn p-4 border border-neutral-200 hover:border-primary rounded-lg text-left" data-scene="bedroom">
+                                    <span class="block font-medium text-lg">卧室</span>
+                                    <span class="text-sm text-neutral-600">18㎡ · 私密休憩空间</span>
+                                </button>
+                                <button class="vr-scene-btn p-4 border border-neutral-200 hover:border-primary rounded-lg text-left" data-scene="balcony">
+                                    <span class="block font-medium text-lg">阳台</span>
+                                    <span class="text-sm text-neutral-600">8㎡ · 休闲放松区</span>
+                                </button>
+                                <button class="vr-scene-btn p-4 border border-neutral-200 hover:border-primary rounded-lg text-left" data-scene="dining">
+                                    <span class="block font-medium text-lg">餐厅</span>
+                                    <span class="text-sm text-neutral-600">15㎡ · 社交用餐区</span>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- 操作提示 - 极简图标+文字 -->
+                        <div class="bg-white p-6 rounded-lg">
+                            <h4 class="font-medium text-lg mb-4">操作指南</h4>
+                            <ul class="space-y-3 text-neutral-600">
+                                <li class="flex items-center"><i class="fa fa-mouse-pointer text-primary mr-3 text-lg"></i> 拖动鼠标旋转视角</li>
+                                <li class="flex items-center"><i class="fa fa-search-plus text-primary mr-3 text-lg"></i> 滚轮缩放画面</li>
+                                <li class="flex items-center"><i class="fa fa-info-circle text-primary mr-3 text-lg"></i> 点击热点查看详情</li>
+                                <li class="flex items-center"><i class="fa fa-expand text-primary mr-3 text-lg"></i> 双击进入全屏模式</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 右侧：VR展示区 - 沉浸式大尺寸 -->
+                <div class="lg:col-span-3">
+                    <div class="rounded-2xl overflow-hidden shadow-2xl h-[700px] relative mb-8">
+                        <!-- VR全景容器 -->
+                        <div id="vrContainer" class="w-full h-full"></div>
+                        
+                        <!-- 加载提示 - 极简加载动画 -->
+                        <div id="vrLoader" class="absolute inset-0 bg-white flex items-center justify-center">
+                            <div class="text-center">
+                                <div class="inline-block animate-spin rounded-full h-16 w-16 border-4 border-neutral-100 border-t-primary mb-6"></div>
+                                <p class="text-neutral-600 text-lg">正在加载VR场景...</p>
+                            </div>
+                        </div>
+                        
+                        <!-- 热点信息弹窗 - 参考oakelcity的精致弹窗 -->
+                        <div id="hotspotPopup" class="absolute hidden bg-white rounded-xl shadow-2xl p-6 w-80 z-10">
+                            <h4 id="hotspotTitle" class="font-bold text-xl mb-3">北欧橡木沙发</h4>
+                            <p id="hotspotDesc" class="text-neutral-600 mb-4">棉麻面料，实木框架，与橡木地板完美搭配，触感柔软舒适</p>
+                            <div class="flex justify-between items-center pt-4 border-t border-neutral-100">
+                                <span class="text-primary font-bold text-xl" id="hotspotPrice">¥3,299</span>
+                                <button class="bg-primary/5 hover:bg-primary/10 text-primary px-4 py-2 rounded-lg transition-colors">
+                                    查看详情
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 家具列表 - 极简网格 -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                        <div class="bg-light p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
+                            <!-- 1. 北欧橡木沙发图片替换 -->
+                            <img src="https://cdn.shopify.com/s/files/1/0932/3220/2030/files/FLRST-SL-RGPL-S4-A2-C0-MGF-BM_FA.jpg?v=1764103925&width=2200&height=1238&crop=center" alt="北欧橡木沙发" class="w-full h-32 object-cover rounded-lg mb-4">
+                            <h4 class="font-medium">北欧橡木沙发</h4>
+                            <p class="text-primary font-bold mt-2">¥3,299</p>
+                        </div>
+                        <div class="bg-light p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
+                            <!-- 2. 实木茶几图片替换 -->
+                            <img src="https://cdn.shopify.com/s/files/1/0932/3220/2030/files/FLRTB-CT-SR-OK_01_cf9b3aa1-e6ad-4c28-a5e1-8e94c1c20581.jpg?v=1750188083&width=2200&height=1238&crop=center" alt="实木茶几" class="w-full h-32 object-cover rounded-lg mb-4">
+                            <h4 class="font-medium">实木茶几</h4>
+                            <p class="text-primary font-bold mt-2">¥1,599</p>
+                        </div>
+                        <div class="bg-light p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
+                            <!-- 3. 羊毛地毯图片替换 -->
+                            <img src="https://cdn.shopify.com/s/files/1/0932/3220/2030/files/ALRRG-SM-CP-DBWH_19b924f6-7770-4c29-9be9-783c6afcce39.jpg?v=1750193355&width=2200&height=1238&crop=center" alt="羊毛地毯" class="w-full h-32 object-cover rounded-lg mb-4">
+                            <h4 class="font-medium">羊毛地毯</h4>
+                            <p class="text-primary font-bold mt-2">¥899</p>
+                        </div>
+                        <div class="bg-light p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
+                            <!-- 4. 原木落地灯改为靠枕 + 图片替换 -->
+                            <img src="https://cdn.shopify.com/s/files/1/0932/3220/2030/files/OdLfSpgoQ4CTKMXTK7vL.jpg?v=1750162982&width=2200&height=1238&crop=center" alt="靠枕" class="w-full h-32 object-cover rounded-lg mb-4">
+                            <h4 class="font-medium">靠枕</h4>
+                            <p class="text-primary font-bold mt-2">¥699</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 关于我们 - 参考burrow的极简叙事布局 -->
+    <section id="about" class="py-24 md:py-32 relative text-white">
+        <!-- 新增的背景图片 -->
+        <div class="absolute inset-0 about-bg" style="background-image: url('https://kimi-web-img.moonshot.cn/img/img.freepik.com/f9aca0f91c1e203901d3a959d1600e77e48518c8.jpg'); filter: brightness(0.5);">
+            <div class="absolute inset-0 bg-dark/70"></div>
+        </div>
+        
+        <!-- 内容容器 -->
+        <div class="container mx-auto px-4 md:px-8 lg:px-16 relative z-10">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+                <div class="order-2 lg:order-1">
+                    <h2 class="text-[clamp(2rem,5vw,3.5rem)] font-bold mb-8">关于WIN FLOOR</h2>
+                    <p class="text-white/80 text-lg mb-6 max-w-lg">
+                        我们专注于高品质地板的设计与生产，与全球顶级家具品牌合作，为客户提供从地板到家具的一站式空间解决方案。
+                    </p>
+                    <p class="text-white/80 text-lg mb-10 max-w-lg">
+                        每一款地板都经过严格的质量检测，确保环保、耐用、美观。我们的VR体验技术让你在装修前就能直观感受地板与家具的搭配效果，避免装修遗憾。
+                    </p>
+                    
+                    <!-- 数据展示 - 极简数字排版 -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+                        <div>
+                            <h3 class="text-4xl font-bold mb-2">20+</h3>
+                            <p class="text-white/70">年生产经验</p>
+                        </div>
+                        <div>
+                            <h3 class="text-4xl font-bold mb-2">5000+</h3>
+                            <p class="text-white/70">满意客户</p>
+                        </div>
+                        <div>
+                            <h3 class="text-4xl font-bold mb-2">50+</h3>
+                            <p class="text-white/70">地板款式</p>
+                        </div>
+                        <div>
+                            <h3 class="text-4xl font-bold mb-2">10+</h3>
+                            <p class="text-white/70">风格匹配</p>
+                        </div>
+                    </div>
+                    
+                    <a href="#contact" class="btn-secondary inline-block">
+                        联系我们了解更多
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 联系我们 - 参考xsurfaces的极简表单设计 -->
+    <section id="contact" class="py-24 md:py-32 bg-light">
+        <div class="container mx-auto px-4 md:px-8 lg:px-16">
+            <div class="max-w-6xl mx-auto bg-white rounded-3xl shadow-xl overflow-hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-2">
+                    <!-- 表单区域 -->
+                    <div class="p-8 md:p-12 lg:p-16">
+                        <h2 class="text-3xl font-bold mb-6">咨询专属顾问</h2>
+                        <p class="text-neutral-600 mb-10 max-w-md">告诉我们你的需求，我们将为你推荐最适合的地板和家具搭配方案</p>
+                        
+                        <form id="consultForm">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                <div>
+                                    <label class="block text-sm font-medium mb-2" for="name">姓名</label>
+                                    <input type="text" id="name" class="w-full px-5 py-3 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" placeholder="请输入你的姓名">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-2" for="phone">电话</label>
+                                    <input type="tel" id="phone" class="w-full px-5 py-3 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" placeholder="请输入你的联系电话">
+                                </div>
+                            </div>
+                            
+                            <div class="mb-6">
+                                <label class="block text-sm font-medium mb-2" for="preferredFloor">意向地板类型</label>
+                                <select id="preferredFloor" class="w-full px-5 py-3 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
+                                    <option value="">请选择</option>
+                                    <option value="oak">北欧橡木</option>
+                                    <option value="walnut">胡桃木</option>
+                                    <option value="maple">枫木</option>
+                                    <option value="bamboo">竹纹</option>
+                                    <option value="concrete">水泥纹</option>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-8">
+                                <label class="block text-sm font-medium mb-2" for="message">需求描述</label>
+                                <textarea id="message" rows="5" class="w-full px-5 py-3 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" placeholder="请描述你的装修需求和空间情况"></textarea>
+                            </div>
+                            
+                            <button type="submit" class="btn-primary w-full">
+                                提交咨询 <i class="fa fa-paper-plane ml-2"></i>
+                            </button>
+                        </form>
+                    </div>
+                    
+                    <!-- 联系信息区域 - 极简卡片式 -->
+                    <div class="bg-primary/5 p-8 md:p-12 lg:p-16 flex flex-col justify-between">
+                        <div>
+                            <h3 class="text-2xl font-bold mb-8">联系方式</h3>
+                            <ul class="space-y-8">
+                                <li class="flex items-start">
+                                    <div class="bg-white p-4 rounded-full mr-5">
+                                        <i class="fa fa-map-marker text-primary text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-medium text-lg mb-1">工厂地址</h4>
+                                        <!-- 修改1：更新工厂地址 -->
+                                        <p class="text-neutral-600">广东省佛山市南海区里水镇月池村墨园街五巷13号</p>
+                                    </div>
+                                </li>
+                                <li class="flex items-start">
+                                    <div class="bg-white p-4 rounded-full mr-5">
+                                        <i class="fa fa-phone text-primary text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-medium text-lg mb-1">联系电话</h4>
+                                        <!-- 修改2：更新联系电话 -->
+                                        <p class="text-neutral-600">18219287002</p>
+                                    </div>
+                                </li>
+                                <li class="flex items-start">
+                                    <div class="bg-white p-4 rounded-full mr-5">
+                                        <i class="fa fa-envelope text-primary text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-medium text-lg mb-1">电子邮箱</h4>
+                                        <!-- 修改3：更新电子邮箱 -->
+                                        <p class="text-neutral-600">3165953327@qq.com</p>
+                                    </div>
+                                </li>
+                                <li class="flex items-start">
+                                    <div class="bg-white p-4 rounded-full mr-5">
+                                        <i class="fa fa-clock-o text-primary text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-medium text-lg mb-1">营业时间</h4>
+                                        <p class="text-neutral-600">周一至周日 9:00 - 18:00</p>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+                        
+                        <!-- 社交媒体 -->
+                        <div class="mt-12">
+                            <h4 class="font-medium text-lg mb-4">关注我们</h4>
+                            <div class="flex space-x-4">
+                                <a href="#" class="bg-white w-12 h-12 rounded-full flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-colors">
+                                    <i class="fa fa-weixin text-lg"></i>
+                                </a>
+                                <a href="#" class="bg-white w-12 h-12 rounded-full flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-colors">
+                                    <i class="fa fa-weibo text-lg"></i>
+                                </a>
+                                <a href="#" class="bg-white w-12 h-12 rounded-full flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-colors">
+                                    <i class="fa fa-instagram text-lg"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 页脚 - 参考burrow的极简页脚 -->
+    <footer class="bg-coffee text-white py-16 md:py-20">
+        <div class="container mx-auto px-4 md:px-8 lg:px-16">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
+                <div>
+                    <h3 class="text-2xl font-bold mb-6">WIN<span class="text-gradient">FLOOR</span></h3>
+                    <p class="text-white/70 mb-8 max-w-xs">为每个家打造独一无二的地板与家具搭配方案，赋予空间温度与质感</p>
+                    <div class="flex space-x-5">
+                        <a href="#" class="text-white/70 hover:text-primary transition-colors">
+                            <i class="fa fa-weixin text-xl"></i>
+                        </a>
+                        <a href="#" class="text-white/70 hover:text-primary transition-colors">
+                            <i class="fa fa-weibo text-xl"></i>
+                        </a>
+                        <a href="#" class="text-white/70 hover:text-primary transition-colors">
+                            <i class="fa fa-instagram text-xl"></i>
+                        </a>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 class="font-bold text-lg mb-6">产品系列</h4>
+                    <ul class="space-y-3">
+                        <li><a href="#" class="text-white/70 hover:text-primary transition-colors">北欧橡木系列</a></li>
+                        <li><a href="#" class="text-white/70 hover:text-primary transition-colors">胡桃木系列</a></li>
+                        <li><a href="#" class="text-white/70 hover:text-primary transition-colors">枫木系列</a></li>
+                        <li><a href="#" class="text-white/70 hover:text-primary transition-colors">竹纹系列</a></li>
+                        <li><a href="#" class="text-white/70 hover:text-primary transition-colors">水泥纹系列</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="font-bold text-lg mb-6">快速链接</h4>
+                    <ul class="space-y-3">
+                        <li><a href="#floors" class="text-white/70 hover:text-primary transition-colors">地板系列</a></li>
+                        <li><a href="#style-matcher" class="text-white/70 hover:text-primary transition-colors">风格匹配</a></li>
+                        <li><a href="#vr-experience" class="text-white/70 hover:text-primary transition-colors">VR体验</a></li>
+                        <li><a href="#about" class="text-white/70 hover:text-primary transition-colors">关于我们</a></li>
+                        <li><a href="#contact" class="text-white/70 hover:text-primary transition-colors">联系我们</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="font-bold text-lg mb-6">服务支持</h4>
+                    <ul class="space-y-3">
+                        <li><a href="#" class="text-white/70 hover:text-primary transition-colors">安装指南</a></li>
+                        <li><a href="#" class="text-white/70 hover:text-primary transition-colors">保养知识</a></li>
+                        <li><a href="#" class="text-white/70 hover:text-primary transition-colors">常见问题</a></li>
+                        <li><a href="#" class="text-white/70 hover:text-primary transition-colors">售后服务</a></li>
+                        <li><a href="#" class="text-white/70 hover:text-primary transition-colors">隐私政策</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="border-t border-neutral-800 pt-8 text-center text-white/50 text-sm">
+                <p>© 2025 WIN FLOOR 版权所有 | 沪ICP备12345678号</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 所有交互逻辑 -->
+    <script type="text/javascript">
+        // 等待DOM加载完成
+        document.addEventListener('DOMContentLoaded', function() {
+            // ======================== 基础交互 ========================
+            // 移动端菜单控制
+            const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+            const closeMenuBtn = document.getElementById('closeMenuBtn');
+            const mobileMenu = document.getElementById('mobileMenu');
+            
+            mobileMenuBtn.addEventListener('click', function() {
+                mobileMenu.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+            });
+            
+            closeMenuBtn.addEventListener('click', function() {
+                mobileMenu.classList.add('hidden');
+                document.body.style.overflow = 'auto';
+            });
+            
+            // 移动端菜单链接点击关闭
+            mobileMenu.querySelectorAll('a').forEach(link => {
+                link.addEventListener('click', function() {
+                    mobileMenu.classList.add('hidden');
+                    document.body.style.overflow = 'auto';
+                });
+            });
+            
+            // 导航栏滚动效果
+            const header = document.querySelector('header');
+            window.addEventListener('scroll', function() {
+                if (window.scrollY > 50) {
+                    header.classList.add('header-scrolled');
+                } else {
+                    header.classList.remove('header-scrolled');
+                }
+            });
+            
+            // 平滑滚动
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    
+                    const targetId = this.getAttribute('href');
+                    const targetElement = document.querySelector(targetId);
+                    
+                    if (targetElement) {
+                        window.scrollTo({
+                            top: targetElement.offsetTop - 80,
+                            behavior: 'smooth'
+                        });
+                    }
+                });
+            });
+            
+            // ======================== 地板选择器 ========================
+            const floorButtons = document.querySelectorAll('.floor-btn');
+            const floorImage = document.getElementById('floorImage');
+            const floorName = document.getElementById('floorName');
+            const floorDesc = document.getElementById('floorDesc');
+            const floorStyle = document.getElementById('floorStyle');
+            const floorFurniture = document.getElementById('floorFurniture');
+            
+            // 地板数据 - 高级描述 + 专属图片链接
+            const floorData = {
+                oak: {
+                    name: '北欧橡木地板',
+                    image: 'https://kimi-web-img.moonshot.cn/img/appalachianflooring.com/d86afc56e02939d27e665862a452ffc76d2d3024.jpg',
+                    desc: '自然纹理，温润质感，适配北欧、日式简约风格家具，为空间带来自然舒适的氛围。精选欧洲进口橡木，纹理清晰自然，色泽温润柔和，每一片地板都保留了木材的天然美感。',
+                    style: '北欧、日式、极简、原木风',
+                    furniture: '原木色实木家具、棉麻布艺沙发、藤编装饰'
+                },
+                walnut: {
+                    name: '胡桃木地板',
+                    image: 'https://images.unsplash.com/photo-1596443686093-501ba68a0ba6?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80',
+                    desc: '深色纹理，沉稳大气，轻奢质感，适配新中式、美式复古风格，提升空间高级感',
+                    style: '轻奢、新中式、美式、复古风',
+                    furniture: '皮质沙发、金属装饰、深色实木家具'
+                },
+                maple: {
+                    name: '枫木地板',
+                    image: 'https://images.unsplash.com/photo-1560448075-bb485b067938?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80',
+                    desc: '浅色纹理，清新明亮，现代简约，适配ins风、轻奢风格，打造通透空间感',
+                    style: '现代、简约、轻奢、ins风',
+                    furniture: '布艺沙发、玻璃茶几、金属框架家具'
+                },
+                bamboo: {
+                    name: '竹纹地板',
+                    image: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80',
+                    desc: '自然竹纹，环保耐用，禅意美学，适配新中式、东南亚风格，回归自然本真',
+                    style: '新中式、禅意、东南亚、自然风',
+                    furniture: '竹制家具、棉麻坐垫、木质屏风'
+                },
+                concrete: {
+                    name: '水泥纹地板',
+                    image: 'https://images.unsplash.com/photo-1590490360182-122102c0c2cb?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80',
+                    desc: '工业风格，简约粗犷，侘寂美学，适配极简、工业风，打造独特空间个性',
+                    style: '工业风、极简、现代、侘寂风',
+                    furniture: '铁艺家具、皮革沙发、混凝土装饰'
+                }
+            };
+            
+            // 地板按钮点击事件
+            floorButtons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    // 移除所有按钮的active状态
+                    floorButtons.forEach(b => b.classList.remove('active'));
+                    // 添加当前按钮的active状态
+                    this.classList.add('active');
+                    
+                    // 获取地板类型
+                    const floorType = this.getAttribute('data-floor');
+                    // 更新地板信息
+                    const floor = floorData[floorType];
+                    
+                    // 图片加载过渡
+                    floorImage.classList.add('loading');
+                    floorImage.onload = function() {
+                        floorImage.classList.remove('loading');
+                    };
+                    
+                    floorImage.src = floor.image;
+                    floorImage.alt = floor.name;
+                    floorName.textContent = floor.name;
+                    floorDesc.textContent = floor.desc;
+                    floorStyle.textContent = floor.style;
+                    floorFurniture.textContent = floor.furniture;
+                    
+                    // 更新VR地板选择器
+                    document.getElementById('vrFloorSelector').value = floorType;
+                    // 更新VR场景
+                    updateVRScene(currentScene, floorType);
+                });
+            });
+            
+            // ======================== VR体验核心功能 ========================
+            const vrContainer = document.getElementById('vrContainer');
+            const vrLoader = document.getElementById('vrLoader');
+            const vrSceneButtons = document.querySelectorAll('.vr-scene-btn');
+            const matchFurnitureButtons = document.querySelectorAll('.match-furniture-btn');
+            const hotspotPopup = document.getElementById('hotspotPopup');
+            const hotspotTitle = document.getElementById('hotspotTitle');
+            const hotspotDesc = document.getElementById('hotspotDesc');
+            const hotspotPrice = document.getElementById('hotspotPrice');
+            
+            // 当前选中的场景和地板
+            let currentScene = 'livingroom';
+            let currentFloor = 'oak';
+            let viewer = null;
+            
+            // VR场景数据（补充完整你提供的不完整数据）
+            const vrSceneData = {
+                livingroom: {
+                    // 5. VR场景图片替换
+                    oak: 'https://cdn.sanity.io/images/gan92b2a/burrow-production/68c80452ad63cc098ca5c69cc9847a7f6fc691e3-11428x8626.jpg?auto=format&fit=max&q=75&w=1200',
+                    walnut: 'https://images.unsplash.com/photo-1590490360182-122102c0c2cb?ixlib=rb-4.0.3&auto=format&fit=crop&w=8192&q=80',
+                    maple: 'https://images.unsplash.com/photo-1560448075-bb485b067938?ixlib=rb-4.0.3&auto=format&fit=crop&w=8192&q=80',
+                    bamboo: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?ixlib=rb-4.0.3&auto=format&fit=crop&w=8192&q=80',
+                    concrete: 'https://images.unsplash.com/photo-1596443686093-501ba68a0ba6?ixlib=rb-4.0.3&auto=format&fit=crop&w=8192&q=80',
+                    hotspots: [
+                        {
+                            pitch: -5,
+                            yaw: -20,
+                            title: '北欧橡木沙发',
+                            desc: '棉麻面料，实木框架，与橡木地板完美搭配，触感柔软舒适',
+                            price: '¥3,299'
+                        },
+                        {
+                            pitch: -10,
+                            yaw: 30,
+                            title: '实木茶几',
+                            desc: '精选橡木打造，简约设计，与地板纹理相得益彰',
+                            price: '¥1,599'
+                        },
+                        {
+                            pitch: -15,
+                            yaw: -60,
+                            title: '羊毛地毯',
+                            desc: '柔软亲肤，防滑底衬，为空间增添温暖质感',
+                            price: '¥899'
+                        },
+                        {
+                            pitch: -8,
+                            yaw: 70,
+                            title: '靠枕',
+                            desc: '纯棉面料，羽绒填充，舒适贴合，提升空间温馨感',
+                            price: '¥699'
+                        }
+                    ]
+                },
+                bedroom: {
+                    oak: 'https://images.unsplash.com/photo-1560448075-bb485b067938?ixlib=rb-4.0.3&auto=format&fit=crop&w=8192&q=80',
+                    walnut: 'https://images.unsplash.com/photo-1596443686093-501ba68a0ba6?ixlib=rb-4.0.3&auto=format&fit=crop&w=8192&q=80',
+                    maple: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?ixlib=rb-4.0.3&auto=format&fit=crop&w=8192&q=80',
+                    bamboo: 'https://images.unsplash.com/photo-1590490360182-122102c0c2cb?ixlib=rb-4.0.3&auto=format&fit=crop&w=8192&q=80',
+                    concrete: 'https://images.unsplash.com/photo-1600210492493-094656734953?ixlib=rb-4.0.3&auto=format&fit=crop&w=8192&q=80',
+                    hotspots: [
+                        {
+                            pitch: -5,
+                            yaw: -20,
+                            title: '橡木床架',
+                            desc: '实木打造，稳固耐用，与地板完美融合',
+                            price: '¥4,599'
+                        },
+                        {
+                            pitch: -10,
+                            yaw: 30,
+                            title: '悬浮床头柜',
+                            desc: '简约设计，节省空间，收纳功能强大',
+                            price: '¥899'
+                        }
+                    ]
+                },
+                dining: {
+                    oak: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?ixlib=rb-4.0.3&auto=format&fit=crop&w=8192&q=80',
+                    walnut: 'https://images.unsplash.com/photo-1600210492493-094656734953?ixlib=rb-4.0.3&auto=format&fit=crop&w=8192&q=80',
+                    maple: 'https://images.unsplash.com/photo-1590490360182-122102c0c2cb?ixlib=rb-4.0.3&auto=format&fit=crop&w=8192&q=80',
+                    bamboo: 'https://images.unsplash.com/photo-1560448075-bb485b067938?ixlib=rb-4.0.3&auto=format&fit=crop&w=8192&q=80',
+                    concrete: 'https://images.unsplash.com/photo-1596443686093-501ba68a0ba6?ixlib=rb-4.0.3&auto=format&fit=crop&w=8192&q=80',
+                    hotspots: [
+                        {
+                            pitch: -5,
+                            yaw: -20,
+                            title: '实木餐桌',
+                            desc: '宽大桌面，稳固桌腿，适合家庭聚餐',
+                            price: '¥3,299'
+                        },
+                        {
+                            pitch: -10,
+                            yaw: 30,
+                            title: '皮质餐椅',
+                            desc: '舒适靠背，耐用皮质，易清洁打理',
+                            price: '¥1,299'
+                        }
+                    ]
+                },
+                balcony: {
+                    oak: 'https://images.unsplash.com/photo-1590490360182-122102c0c2cb?ixlib=rb-4.0.3&auto=format&fit=crop&w=8192&q=80',
+                    walnut: 'https://images.unsplash.com/photo-1560448075-bb485b067938?ixlib=rb-4.0.3&auto=format&fit=crop&w=8192&q=80',
+                    maple: 'https://images.unsplash.com/photo-1596443686093-501ba68a0ba6?ixlib=rb-4.0.3&auto=format&fit=crop&w=8192&q=80',
+                    bamboo: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?ixlib=rb-4.0.3&auto=format&fit=crop&w=8192&q=80',
+                    concrete: 'https://images.unsplash.com/photo-1600210492493-094656734953?ixlib=rb-4.0.3&auto=format&fit=crop&w=8192&q=80',
+                    hotspots: [
+                        {
+                            pitch: -5,
+                            yaw: -20,
+                            title: '防腐木休闲椅',
+                            desc: '防水防腐，舒适设计，适合户外使用',
+                            price: '¥2,199'
+                        },
+                        {
+                            pitch: -10,
+                            yaw: 30,
+                            title: '藤编茶几',
+                            desc: '轻便易移动，自然藤编材质，环保美观',
+                            price: '¥799'
+                        }
+                    ]
+                }
+            };
+            
+            // 初始化VR场景
+            function initVRScene(scene, floor) {
+                // 如果已有viewer实例，先销毁
+                if (viewer) {
+                    viewer.destroy();
+                }
+                
+                // 显示加载器
+                vrLoader.style.display = 'flex';
+                
+                // 获取场景图片URL
+                const imageUrl = vrSceneData[scene][floor];
+                
+                // 创建新的viewer实例
+                viewer = pannellum.viewer('vrContainer', {
+                    type: 'equirectangular',
+                    panorama: imageUrl,
+                    autoLoad: true,
+                    showControls: true,
+                    showFullscreenCtrl: true,
+                    showZoomCtrl: true,
+                    compass: true,
+                    draggable: true,
+                    keyboardZoom: true,
+                    mouseZoom: true,
+                    zoomLevel: 1,
+                    maxZoomLevel: 5,
+                    minZoomLevel: 0.5,
+                    orientationOnByDefault: false,
+                    hotSpots: []
+                });
+                
+                // 加载完成后隐藏加载器
+                viewer.on('load', function() {
+                    vrLoader.style.display = 'none';
+                    
+                    // 添加热点
+                    addHotspots(scene);
+                });
+                
+                // 错误处理
+                viewer.on('error', function() {
+                    vrLoader.style.display = 'none';
+                    alert('VR场景加载失败，请稍后重试');
+                });
+            }
+            
+            // 添加热点
+            function addHotspots(scene) {
+                const hotspots = vrSceneData[scene].hotspots;
+                
+                hotspots.forEach((hotspot, index) => {
+                    viewer.addHotSpot({
+                        pitch: hotspot.pitch,
+                        yaw: hotspot.yaw,
+                        type: 'custom',
+                        cssClass: 'pnlm-hotspot',
+                        clickHandler: function() {
+                            // 更新弹窗内容
+                            hotspotTitle.textContent = hotspot.title;
+                            hotspotDesc.textContent = hotspot.desc;
+                            hotspotPrice.textContent = hotspot.price;
+                            
+                            // 显示弹窗
+                            hotspotPopup.style.display = 'block';
+                            
+                            // 获取热点位置
+                            const hotspotEl = document.querySelector(`.pnlm-hotspot:nth-child(${index+1})`);
+                            if (hotspotEl) {
+                                const rect = hotspotEl.getBoundingClientRect();
+                                const vrContainerRect = vrContainer.getBoundingClientRect();
+                                
+                                // 定位弹窗
+                                hotspotPopup.style.top = `${rect.top - vrContainerRect.top - 160}px`;
+                                hotspotPopup.style.left = `${rect.left - vrContainerRect.left - 120}px`;
+                            }
+                        }
+                    });
+                });
+                
+                // 点击VR容器空白处关闭弹窗
+                vrContainer.addEventListener('click', function(e) {
+                    if (!e.target.closest('.pnlm-hotspot') && !e.target.closest('#hotspotPopup')) {
+                        hotspotPopup.style.display = 'none';
+                    }
+                });
+            }
+            
+            // 更新VR场景
+            function updateVRScene(scene, floor) {
+                currentScene = scene;
+                currentFloor = floor;
+                initVRScene(scene, floor);
+            }
+            
+            // VR场景按钮点击事件
+            vrSceneButtons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    // 移除所有按钮的active状态
+                    vrSceneButtons.forEach(b => b.classList.remove('active'));
+                    // 添加当前按钮的active状态
+                    this.classList.add('active');
+                    
+                    // 获取场景类型
+                    const scene = this.getAttribute('data-scene');
+                    // 获取当前选择的地板类型
+                    const floor = document.getElementById('vrFloorSelector').value;
+                    
+                    // 更新VR场景
+                    updateVRScene(scene, floor);
+                });
+            });
+            
+            // 风格匹配器按钮点击事件
+            matchFurnitureButtons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    // 获取场景类型
+                    const scene = this.getAttribute('data-scene');
+                    
+                    // 滚动到VR体验区
+                    document.querySelector('#vr-experience').scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                    
+                    // 更新VR场景按钮状态
+                    vrSceneButtons.forEach(b => {
+                        b.classList.remove('active');
+                        if (b.getAttribute('data-scene') === scene) {
+                            b.classList.add('active');
+                        }
+                    });
+                    
+                    // 获取当前选择的地板类型
+                    const floor = document.getElementById('vrFloorSelector').value;
+                    
+                    // 延迟更新场景，确保滚动完成
+                    setTimeout(() => {
+                        updateVRScene(scene, floor);
+                    }, 500);
+                });
+            });
+            
+            // 地板选择器变更事件
+            document.getElementById('vrFloorSelector').addEventListener('change', function() {
+                const floor = this.value;
+                updateVRScene(currentScene, floor);
+            });
+            
+            // 初始化默认VR场景
+            initVRScene('livingroom', 'oak');
+            
+            // 关闭热点弹窗
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('#hotspotPopup') && !e.target.closest('.pnlm-hotspot')) {
+                    hotspotPopup.style.display = 'none';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
